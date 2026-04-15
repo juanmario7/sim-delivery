@@ -6,7 +6,7 @@
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection string (`postgresql://user:pass@host:5432/db`) |
 | `GOOGLE_MAPS_API_KEY` | Google Maps API key (Geocoding API + Places API habilitadas) |
-| `BASE_URL` | URL pública del servidor, ej: `https://vmcontigo.co` |
+| `BASE_URL` | URL pública del servidor: `https://entregas.vmcontigo.co` |
 
 ## Instalar dependencias
 
@@ -21,16 +21,27 @@ cp .env.example .env   # edita con tus valores
 python run.py
 ```
 
-## Correr en producción (Heroku / AWS)
+## Deploy en Railway
 
-```bash
-# Heroku
-heroku config:set DATABASE_URL=... GOOGLE_MAPS_API_KEY=... BASE_URL=...
-git push heroku main
+1. **New Project** → Deploy from GitHub repo → `juanmario7/sim-delivery`
+2. **New** → Database → PostgreSQL (Railway configura `DATABASE_URL` automáticamente)
+3. En **Variables** del servicio web:
+   ```
+   GOOGLE_MAPS_API_KEY = tu_clave
+   BASE_URL            = https://entregas.vmcontigo.co
+   ```
+4. En **Settings** → Custom Domain → agrega `entregas.vmcontigo.co`
+5. Railway te dará un valor CNAME para apuntar el DNS (paso siguiente)
 
-# AWS / Lightsail (con gunicorn)
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
+## Configuración DNS
+
+En el proveedor de dominio de `vmcontigo.co`, agrega:
+
+| Tipo  | Nombre    | Valor                          |
+|-------|-----------|--------------------------------|
+| CNAME | entregas  | `<tu-app>.railway.app`         |
+
+El valor exacto del CNAME lo obtienes en Railway → Settings → Custom Domain.
 
 ## Rutas
 
