@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Actualiza tu dirección – Virgin Mobile</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --brand:    #E20074;
+      --brand-dk: #b3005a;
+      --bg:       #f5f5f5;
+      --card:     #ffffff;
+      --text:     #1a1a1a;
+      --muted:    #666;
+      --border:   #e0e0e0;
+      --success:  #00a651;
+      --radius:   12px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 48px;
+    }
+
+    /* ── Header ── */
+    .header {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .logo {
+      width: 44px;
+      height: 44px;
+      background: var(--brand);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .logo svg { width: 26px; height: 26px; fill: white; }
+    .brand-name { font-size: 1.15rem; font-weight: 700; color: var(--brand); }
+    .brand-sub  { font-size: 0.78rem; color: var(--muted); }
+
+    /* ── Card ── */
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: 0 2px 16px rgba(0,0,0,.08);
+      padding: 32px 28px;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    /* ── States ── */
+    #state-loading, #state-error, #state-used, #state-form, #state-success {
+      display: none;
+    }
+    #state-loading.active,
+    #state-error.active,
+    #state-used.active,
+    #state-form.active,
+    #state-success.active { display: block; }
+
+    /* Loading */
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--brand);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin: 16px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { text-align: center; color: var(--muted); font-size: .9rem; margin-top: 8px; }
+
+    /* Error / Used */
+    .icon-block { text-align: center; margin-bottom: 20px; }
+    .icon-block .icon { font-size: 3rem; }
+    .state-title { font-size: 1.25rem; font-weight: 700; color: var(--text); text-align: center; margin-bottom: 8px; }
+    .state-body  { font-size: .9rem; color: var(--muted); text-align: center; line-height: 1.5; }
+
+    /* Form */
+    .alert-banner {
+      background: #fff3e0;
+      border-left: 4px solid #ff9800;
+      border-radius: 6px;
+      padding: 14px 16px;
+      margin-bottom: 24px;
+      font-size: .88rem;
+      color: #5d3a00;
+      line-height: 1.5;
+    }
+    .alert-banner strong { display: block; margin-bottom: 4px; font-size: .95rem; }
+
+    .order-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #f0f0f0;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: .8rem;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+    .order-badge span { font-weight: 600; color: var(--text); }
+
+    .form-label {
+      display: block;
+      font-size: .85rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    .form-label .req { color: var(--brand); }
+
+    .input-wrap { position: relative; margin-bottom: 16px; }
+    .input-wrap input,
+    .input-wrap textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: .95rem;
+      color: var(--text);
+      transition: border-color .2s;
+      background: #fafafa;
+      outline: none;
+    }
+    .input-wrap input:focus,
+    .input-wrap textarea:focus { border-color: var(--brand); background: #fff; }
+    .input-wrap textarea { resize: vertical; min-height: 80px; font-family: inherit; }
+
+    .gps-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: none;
+      border: 1.5px solid var(--brand);
+      color: var(--brand);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: .88rem;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      justify-content: center;
+      margin-bottom: 16px;
+      transition: background .15s, color .15s;
+    }
+    .gps-btn:hover { background: var(--brand); color: #fff; }
+    .gps-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      color: var(--muted);
+      font-size: .8rem;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    #gps-status {
+      font-size: .8rem;
+      color: var(--muted);
+      margin-bottom: 12px;
+      min-height: 18px;
+    }
+    #gps-status.ok  { color: var(--success); }
+    #gps-status.err { color: #d32f2f; }
+
+    .submit-btn {
+      width: 100%;
+      background: var(--brand);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .15s;
+      margin-top: 4px;
+    }
+    .submit-btn:hover:not(:disabled) { background: var(--brand-dk); }
+    .submit-btn:disabled { opacity: .6; cursor: not-allowed; }
+
+    /* Success */
+    .success-icon {
+      width: 72px; height: 72px;
+      background: #e8f5e9;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+    }
+    .success-icon svg { width: 36px; height: 36px; fill: var(--success); }
+    .confirmed-address {
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: .9rem;
+      color: var(--text);
+      margin-top: 16px;
+      text-align: center;
+    }
+
+    #map-preview {
+      width: 100%;
+      height: 200px;
+      border-radius: 8px;
+      margin-top: 12px;
+      border: 1px solid var(--border);
+      display: none;
+    }
+
+    .footer-note {
+      font-size: .75rem;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 20px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">
+    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+  </div>
+  <div>
+    <div class="brand-name">Virgin Mobile</div>
+    <div class="brand-sub">Colombia</div>
+  </div>
+</div>
+
+<!-- Card -->
+<div class="card">
+
+  <!-- Loading -->
+  <div id="state-loading" class="active">
+    <div class="spinner"></div>
+    <p class="loading-text">Cargando tu pedido…</p>
+  </div>
+
+  <!-- Error: invalid link -->
+  <div id="state-error">
+    <div class="icon-block"><div class="icon">🔗</div></div>
+    <p class="state-title">Enlace no válido</p>
+    <p class="state-body">Este enlace no existe o ha expirado. Si crees que es un error, comunícate con nuestro servicio al cliente.</p>
+  </div>
+
+  <!-- Error: already used -->
+  <div id="state-used">
+    <div class="icon-block"><div class="icon">✅</div></div>
+    <p class="state-title">Dirección ya registrada</p>
+    <p class="state-body">Tu dirección ya fue actualizada exitosamente. Pronto recibirás tu SIM card.<br><br>¡Gracias por tu paciencia!</p>
+  </div>
+
+  <!-- Form -->
+  <div id="state-form">
+    <div class="alert-banner">
+      <strong>⚠️ Tu pedido no pudo ser entregado</strong>
+      No logramos ubicar tu dirección de entrega. Por favor actualízala para que podamos enviarte tu SIM card.
+    </div>
+
+    <div class="order-badge">
+      Pedido <span id="order-ref-badge">—</span> · <span id="client-name-badge">—</span>
+    </div>
+
+    <form id="address-form">
+      <label class="form-label">
+        <span class="req">*</span> Dirección de entrega
+      </label>
+
+      <button type="button" class="gps-btn" id="gps-btn">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Usar mi ubicación actual (GPS)
+      </button>
+
+      <p id="gps-status"></p>
+
+      <div class="divider">o escribe la dirección</div>
+
+      <div class="input-wrap">
+        <input
+          type="text"
+          id="address-input"
+          placeholder="Ej: Cra 7 #45-12, Bogotá"
+          autocomplete="off"
+        />
+      </div>
+
+      <label class="form-label" style="margin-top:4px;">
+        Información adicional (apartamento, barrio, referencia…)
+      </label>
+      <div class="input-wrap">
+        <textarea id="address-extra" placeholder="Ej: Apto 301, Torre B, cerca al parque principal"></textarea>
+      </div>
+
+      <div id="map-preview"></div>
+
+      <button type="submit" class="submit-btn" id="submit-btn">
+        Confirmar dirección
+      </button>
+    </form>
+
+    <p class="footer-note">
+      Tus datos son tratados conforme a la política de protección de datos personales de Virgin Mobile Colombia (Ley 1581 de 2012).
+    </p>
+  </div>
+
+  <!-- Success -->
+  <div id="state-success">
+    <div class="success-icon">
+      <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+    </div>
+    <p class="state-title">¡Dirección confirmada!</p>
+    <p class="state-body">Recibimos tu dirección actualizada. Nuestro equipo procesará tu pedido y te enviaremos tu SIM card pronto.</p>
+    <div class="confirmed-address" id="confirmed-address-text"></div>
+    <p class="footer-note" style="margin-top:24px;">¿Tienes dudas? Escríbenos al <strong>*611</strong> o a través del chat en nuestra app.</p>
+  </div>
+
+</div>
+
+<!-- Leaflet for map preview -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+  const token = window.location.pathname.split('/').pop();
+  let gpsCoords = null;
+  let mapPreview = null;
+  let autocomplete = null;
+
+  function show(id) {
+    ['state-loading','state-error','state-used','state-form','state-success'].forEach(s => {
+      document.getElementById(s).classList.remove('active');
+    });
+    document.getElementById(id).classList.add('active');
+  }
+
+  // ── Load order info ──────────────────────────────────────────────────────
+  async function loadOrder() {
+    try {
+      const res = await fetch(`/api/address/${token}`);
+      if (!res.ok) { show('state-error'); return; }
+      const order = await res.json();
+
+      if (order.status !== 'pending') { show('state-used'); return; }
+
+      document.getElementById('order-ref-badge').textContent  = order.order_ref;
+      document.getElementById('client-name-badge').textContent = order.client_name;
+      show('state-form');
+    } catch(e) {
+      show('state-error');
+    }
+  }
+
+  // ── Load Google Maps for Autocomplete ───────────────────────────────────
+  async function loadMaps() {
+    const cfg = await fetch('/api/config').then(r => r.json());
+    if (!cfg.maps_api_key) return;
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${cfg.maps_api_key}&libraries=places&region=CO&language=es&callback=initAutocomplete`;
+    script.async = true;
+    document.head.appendChild(script);
+  }
+
+  window.initAutocomplete = function() {
+    const input = document.getElementById('address-input');
+    autocomplete = new google.maps.places.Autocomplete(input, {
+      componentRestrictions: { country: 'co' },
+      fields: ['formatted_address','geometry'],
+    });
+    autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace();
+      if (place.geometry) {
+        const lat = place.geometry.location.lat();
+        const lng = place.geometry.location.lng();
+        gpsCoords = null; // override GPS if user typed
+        showMapPreview(lat, lng, place.formatted_address);
+      }
+    });
+  };
+
+  function showMapPreview(lat, lng, label) {
+    const el = document.getElementById('map-preview');
+    el.style.display = 'block';
+    if (!mapPreview) {
+      mapPreview = L.map('map-preview', { zoomControl: true, attributionControl: false });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapPreview);
+    }
+    mapPreview.setView([lat, lng], 16);
+    mapPreview.eachLayer(l => { if (l instanceof L.Marker) mapPreview.removeLayer(l); });
+    L.marker([lat, lng]).addTo(mapPreview).bindPopup(label || 'Tu dirección').openPopup();
+    setTimeout(() => mapPreview.invalidateSize(), 100);
+  }
+
+  // ── GPS ──────────────────────────────────────────────────────────────────
+  document.getElementById('gps-btn').addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      setGpsStatus('Tu navegador no soporta GPS.', 'err'); return;
+    }
+    setGpsStatus('Obteniendo ubicación…', '');
+    document.getElementById('gps-btn').disabled = true;
+
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        gpsCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setGpsStatus('Ubicación obtenida correctamente.', 'ok');
+        document.getElementById('gps-btn').disabled = false;
+        showMapPreview(gpsCoords.lat, gpsCoords.lng, 'Tu ubicación actual');
+      },
+      err => {
+        setGpsStatus('No se pudo obtener el GPS. Por favor escribe tu dirección.', 'err');
+        document.getElementById('gps-btn').disabled = false;
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  });
+
+  function setGpsStatus(msg, cls) {
+    const el = document.getElementById('gps-status');
+    el.textContent = msg;
+    el.className = cls;
+  }
+
+  // ── Submit ───────────────────────────────────────────────────────────────
+  document.getElementById('address-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const addressText = document.getElementById('address-input').value.trim();
+    const extra       = document.getElementById('address-extra').value.trim();
+    const fullAddress = extra ? `${addressText} — ${extra}` : addressText;
+
+    if (!addressText && !gpsCoords) {
+      alert('Por favor ingresa tu dirección o usa el GPS.'); return;
+    }
+
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.textContent = 'Enviando…';
+
+    try {
+      const body = { address_text: fullAddress };
+      if (gpsCoords) { body.lat = gpsCoords.lat; body.lng = gpsCoords.lng; }
+
+      const res = await fetch(`/api/address/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        document.getElementById('confirmed-address-text').textContent = fullAddress;
+        show('state-success');
+      } else {
+        const err = await res.json();
+        alert(err.detail || 'Ocurrió un error. Intenta de nuevo.');
+        btn.disabled = false;
+        btn.textContent = 'Confirmar dirección';
+      }
+    } catch(err) {
+      alert('Error de conexión. Intenta de nuevo.');
+      btn.disabled = false;
+      btn.textContent = 'Confirmar dirección';
+    }
+  });
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  loadOrder();
+  loadMaps();
+</script>
+</body>
+</html>

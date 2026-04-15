@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Pedidos – Virgin Mobile</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --brand:    #E20074;
+      --brand-dk: #b3005a;
+      --brand-lt: #fce4f0;
+      --bg:       #f4f4f6;
+      --card:     #ffffff;
+      --text:     #1a1a1a;
+      --muted:    #666;
+      --border:   #e2e2e2;
+      --pending:  #f59e0b;
+      --confirmed:#10b981;
+      --radius:   10px;
+      --sidebar:  240px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Top bar ── */
+    .topbar {
+      background: var(--brand);
+      color: #fff;
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(226,0,116,.3);
+    }
+    .topbar-left { display: flex; align-items: center; gap: 10px; }
+    .topbar-logo {
+      width: 32px; height: 32px;
+      background: rgba(255,255,255,.25);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .topbar-logo svg { width: 18px; height: 18px; fill: #fff; }
+    .topbar-title { font-size: 1rem; font-weight: 700; }
+    .topbar-sub   { font-size: .72rem; opacity: .8; }
+
+    .btn-new {
+      background: #fff;
+      color: var(--brand);
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: .875rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: opacity .15s;
+    }
+    .btn-new:hover { opacity: .88; }
+
+    /* ── Main layout ── */
+    .main { padding: 24px; max-width: 1400px; margin: 0 auto; }
+
+    /* ── Stats ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    .stat-icon {
+      width: 48px; height: 48px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem;
+      flex-shrink: 0;
+    }
+    .stat-icon.total    { background: #ede9fe; }
+    .stat-icon.pending  { background: #fef3c7; }
+    .stat-icon.confirmed{ background: #d1fae5; }
+    .stat-value { font-size: 1.8rem; font-weight: 800; line-height: 1; }
+    .stat-label { font-size: .8rem; color: var(--muted); margin-top: 3px; }
+
+    /* ── Content grid ── */
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 20px;
+      align-items: start;
+    }
+
+    /* ── Filters ── */
+    .filters {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .tabs { display: flex; gap: 4px; background: var(--card); border-radius: 8px; padding: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+    .tab-btn {
+      background: none;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: .85rem;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .tab-btn.active { background: var(--brand); color: #fff; }
+
+    .date-range { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+    .date-range input {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: .82rem;
+      color: var(--text);
+      background: var(--card);
+      outline: none;
+    }
+    .date-range input:focus { border-color: var(--brand); }
+    .date-label { font-size: .8rem; color: var(--muted); }
+
+    /* ── Table card ── */
+    .table-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+      overflow: hidden;
+    }
+    .table-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .table-title { font-size: .95rem; font-weight: 700; }
+    .table-count { font-size: .8rem; color: var(--muted); }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    thead th {
+      padding: 10px 16px;
+      text-align: left;
+      font-size: .75rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      background: #fafafa;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; cursor: pointer; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #fafafa; }
+    tbody tr.selected { background: var(--brand-lt); }
+    td { padding: 12px 16px; vertical-align: middle; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: .76rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .badge-pending  { background: #fef3c7; color: #92400e; }
+    .badge-confirmed{ background: #d1fae5; color: #065f46; }
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+    .client-name { font-weight: 600; }
+    .client-phone { font-size: .78rem; color: var(--muted); margin-top: 2px; }
+    .address-cell { max-width: 200px; font-size: .82rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .actions { display: flex; gap: 6px; }
+    .action-btn {
+      width: 30px; height: 30px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .1s, border-color .1s;
+      flex-shrink: 0;
+    }
+    .action-btn:hover { background: #f0f0f0; border-color: #bbb; }
+    .action-btn svg { width: 15px; height: 15px; fill: var(--muted); pointer-events: none; }
+    .action-btn.wa:hover { background: #dcfce7; border-color: #86efac; }
+    .action-btn.wa svg { fill: #16a34a; }
+    .action-btn.copy:hover { background: #eff6ff; border-color: #93c5fd; }
+    .action-btn.copy svg { fill: #2563eb; }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      font-size: .9rem;
+    }
+    .empty-state .emoji { font-size: 2rem; margin-bottom: 8px; }
+
+    /* ── Right panel ── */
+    .right-panel { display: flex; flex-direction: column; gap: 20px; }
+
+    .panel-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      font-size: .9rem;
+      font-weight: 700;
+    }
+
+    #map { height: 320px; }
+
+    /* Detail panel */
+    .detail-body { padding: 16px 18px; }
+    .detail-empty { padding: 24px 18px; text-align: center; color: var(--muted); font-size: .85rem; }
+    .detail-row { margin-bottom: 12px; }
+    .detail-row-label { font-size: .72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 3px; }
+    .detail-row-value { font-size: .9rem; color: var(--text); word-break: break-word; }
+    .detail-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #f5f5f5;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: .78rem;
+      color: var(--muted);
+      word-break: break-all;
+    }
+    .copy-link-btn {
+      flex-shrink: 0;
+      background: var(--brand);
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      padding: 5px 10px;
+      font-size: .75rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .wa-link-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      width: 100%;
+      background: #16a34a;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      padding: 10px;
+      font-size: .875rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 14px;
+      text-decoration: none;
+    }
+    .wa-link-btn svg { width: 18px; height: 18px; fill: #fff; }
+
+    /* ── Modal ── */
+    .overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .overlay.open { display: flex; }
+    .modal {
+      background: var(--card);
+      border-radius: 14px;
+      width: 100%;
+      max-width: 460px;
+      box-shadow: 0 8px 40px rgba(0,0,0,.18);
+      overflow: hidden;
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-title { font-size: 1rem; font-weight: 700; }
+    .modal-close {
+      width: 30px; height: 30px;
+      background: none; border: none;
+      font-size: 1.4rem; cursor: pointer;
+      color: var(--muted);
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 50%;
+      transition: background .1s;
+    }
+    .modal-close:hover { background: #f0f0f0; }
+    .modal-body { padding: 22px; }
+    .modal-footer { padding: 16px 22px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: .83rem; font-weight: 600; margin-bottom: 6px; }
+    .form-group label .req { color: var(--brand); }
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 7px;
+      font-size: .9rem;
+      color: var(--text);
+      background: #fafafa;
+      outline: none;
+      transition: border-color .15s;
+      font-family: inherit;
+    }
+    .form-group input:focus,
+    .form-group textarea:focus { border-color: var(--brand); background: #fff; }
+    .form-group textarea { resize: vertical; min-height: 70px; }
+
+    .btn { border: none; border-radius: 7px; padding: 10px 20px; font-size: .875rem; font-weight: 700; cursor: pointer; transition: opacity .15s; }
+    .btn:hover { opacity: .85; }
+    .btn-primary { background: var(--brand); color: #fff; }
+    .btn-ghost   { background: #f0f0f0; color: var(--text); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      background: #1a1a1a;
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: .875rem;
+      z-index: 300;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity .2s, transform .2s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: none; }
+
+    @media (max-width: 900px) {
+      .content-grid { grid-template-columns: 1fr; }
+      .stats-grid   { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 600px) {
+      .stats-grid { grid-template-columns: 1fr; }
+      .date-range { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<header class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-logo">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+    </div>
+    <div>
+      <div class="topbar-title">Entregas SIM</div>
+      <div class="topbar-sub">Virgin Mobile Colombia</div>
+    </div>
+  </div>
+  <button class="btn-new" id="btn-new-order">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+    Nuevo pedido
+  </button>
+</header>
+
+<!-- Main -->
+<main class="main">
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon total">📦</div>
+      <div><div class="stat-value" id="stat-total">—</div><div class="stat-label">Total pedidos</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon pending">⏳</div>
+      <div><div class="stat-value" id="stat-pending">—</div><div class="stat-label">Sin dirección</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon confirmed">✅</div>
+      <div><div class="stat-value" id="stat-confirmed">—</div><div class="stat-label">Con dirección</div></div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <div class="tabs">
+      <button class="tab-btn active" data-status="all">Todos</button>
+      <button class="tab-btn" data-status="pending">Pendientes</button>
+      <button class="tab-btn" data-status="confirmed">Confirmados</button>
+    </div>
+    <div class="date-range">
+      <span class="date-label">Desde</span>
+      <input type="date" id="date-from" />
+      <span class="date-label">Hasta</span>
+      <input type="date" id="date-to" />
+      <button class="btn btn-ghost" style="padding:6px 12px;font-size:.8rem;" id="btn-filter">Filtrar</button>
+    </div>
+  </div>
+
+  <!-- Content grid -->
+  <div class="content-grid">
+
+    <!-- Table -->
+    <div>
+      <div class="table-card">
+        <div class="table-header">
+          <span class="table-title">Pedidos</span>
+          <span class="table-count" id="table-count">—</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Pedido</th>
+                <th>Cliente</th>
+                <th>Estado</th>
+                <th>Dirección</th>
+                <th>Creado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="orders-tbody"></tbody>
+          </table>
+          <div class="empty-state" id="empty-state" style="display:none;">
+            <div class="emoji">📭</div>
+            No hay pedidos que mostrar.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right panel -->
+    <div class="right-panel">
+
+      <!-- Detail -->
+      <div class="panel-card">
+        <div class="panel-header">Detalle del pedido</div>
+        <div id="detail-empty" class="detail-empty">
+          Selecciona un pedido para ver el detalle y el enlace de envío.
+        </div>
+        <div id="detail-body" class="detail-body" style="display:none;"></div>
+      </div>
+
+      <!-- Map -->
+      <div class="panel-card">
+        <div class="panel-header">Mapa de direcciones confirmadas</div>
+        <div id="map"></div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<!-- Modal: new order -->
+<div class="overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Nuevo pedido</span>
+      <button class="modal-close" id="modal-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Número de pedido <span class="req">*</span></label>
+        <input type="text" id="field-order-ref" placeholder="Ej: ORD-20240415-001" />
+      </div>
+      <div class="form-group">
+        <label>Nombre del cliente <span class="req">*</span></label>
+        <input type="text" id="field-client-name" placeholder="Nombre completo" />
+      </div>
+      <div class="form-group">
+        <label>Teléfono</label>
+        <input type="tel" id="field-client-phone" placeholder="Ej: 3001234567" />
+      </div>
+      <div class="form-group">
+        <label>Notas internas</label>
+        <textarea id="field-notes" placeholder="Información relevante para el equipo…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="btn-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="btn-save-order">Crear pedido</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  let orders = [];
+  let selectedOrder = null;
+  let activeStatus = 'all';
+  let map, markersLayer;
+  let baseUrl = window.location.origin;
+
+  // ── Map ──────────────────────────────────────────────────────────────────
+  map = L.map('map', { attributionControl: false, zoomControl: true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+  map.setView([4.711, -74.072], 11); // Bogotá default
+  markersLayer = L.layerGroup().addTo(map);
+
+  function refreshMap(data) {
+    markersLayer.clearLayers();
+    const confirmed = data.filter(o => o.status === 'confirmed' && o.address_lat && o.address_lng);
+    confirmed.forEach(o => {
+      const marker = L.circleMarker([o.address_lat, o.address_lng], {
+        radius: 8, fillColor: '#10b981', color: '#fff', weight: 2, fillOpacity: .9
+      });
+      marker.bindPopup(`<strong>${o.order_ref}</strong><br>${o.client_name}<br><small>${o.address_text || ''}</small>`);
+      marker.addTo(markersLayer);
+    });
+    if (confirmed.length > 0) {
+      const group = L.featureGroup(markersLayer.getLayers());
+      map.fitBounds(group.getBounds().pad(.2));
+    }
+  }
+
+  // ── Stats ────────────────────────────────────────────────────────────────
+  async function loadStats() {
+    const s = await fetch('/api/stats').then(r => r.json());
+    document.getElementById('stat-total').textContent     = s.total;
+    document.getElementById('stat-pending').textContent   = s.pending;
+    document.getElementById('stat-confirmed').textContent = s.confirmed;
+  }
+
+  // ── Orders ───────────────────────────────────────────────────────────────
+  async function loadOrders() {
+    const dateFrom = document.getElementById('date-from').value;
+    const dateTo   = document.getElementById('date-to').value;
+    const params   = new URLSearchParams();
+    if (activeStatus !== 'all') params.set('status', activeStatus);
+    if (dateFrom) params.set('date_from', dateFrom);
+    if (dateTo)   params.set('date_to', dateTo);
+
+    const data = await fetch(`/api/orders?${params}`).then(r => r.json());
+    orders = data;
+    renderTable(data);
+    refreshMap(data);
+    document.getElementById('table-count').textContent = `${data.length} pedido${data.length !== 1 ? 's' : ''}`;
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' });
+  }
+
+  function renderTable(data) {
+    const tbody = document.getElementById('orders-tbody');
+    const empty = document.getElementById('empty-state');
+
+    if (data.length === 0) {
+      tbody.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+
+    tbody.innerHTML = data.map(o => `
+      <tr data-id="${o.id}" class="${selectedOrder?.id === o.id ? 'selected' : ''}">
+        <td><strong>${escHtml(o.order_ref)}</strong></td>
+        <td>
+          <div class="client-name">${escHtml(o.client_name)}</div>
+          ${o.client_phone ? `<div class="client-phone">${escHtml(o.client_phone)}</div>` : ''}
+        </td>
+        <td>
+          <span class="badge badge-${o.status}">
+            <span class="badge-dot"></span>
+            ${o.status === 'pending' ? 'Pendiente' : 'Confirmado'}
+          </span>
+        </td>
+        <td class="address-cell" title="${escHtml(o.address_text || '')}">
+          ${o.address_text ? escHtml(o.address_text) : '<span style="color:var(--muted)">—</span>'}
+        </td>
+        <td style="white-space:nowrap;color:var(--muted);font-size:.8rem">${fmtDate(o.created_at)}</td>
+        <td>
+          <div class="actions" onclick="event.stopPropagation()">
+            <button class="action-btn copy" title="Copiar enlace" onclick="copyLink('${o.token}')">
+              <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+            </button>
+            ${o.client_phone ? `
+            <button class="action-btn wa" title="Enviar por WhatsApp" onclick="sendWhatsApp(${JSON.stringify(o).replace(/"/g,'&quot;')})">
+              <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            </button>` : ''}
+          </div>
+        </td>
+      </tr>
+    `).join('');
+
+    tbody.querySelectorAll('tr').forEach(tr => {
+      tr.addEventListener('click', () => {
+        const id = parseInt(tr.dataset.id);
+        selectOrder(orders.find(o => o.id === id));
+      });
+    });
+  }
+
+  function selectOrder(order) {
+    selectedOrder = order;
+    renderTable(orders); // re-render to update selected highlight
+
+    if (!order) {
+      document.getElementById('detail-empty').style.display = 'block';
+      document.getElementById('detail-body').style.display  = 'none';
+      return;
+    }
+
+    document.getElementById('detail-empty').style.display = 'none';
+    const body = document.getElementById('detail-body');
+    body.style.display = 'block';
+
+    const link = `${baseUrl}/address/${order.token}`;
+    const waMsg = encodeURIComponent(
+      `Hola ${order.client_name}, tu pedido *${order.order_ref}* no pudo ser entregado debido a un problema con tu dirección de envío.\n\n` +
+      `Por favor actualiza tu dirección aquí para que podamos enviarte tu SIM card:\n${link}\n\n_Virgin Mobile Colombia_`
+    );
+    const phone = order.client_phone ? order.client_phone.replace(/\D/g,'') : '';
+    const waLink = phone
+      ? `https://wa.me/57${phone}?text=${waMsg}`
+      : `https://wa.me/?text=${waMsg}`;
+
+    body.innerHTML = `
+      <div class="detail-row">
+        <div class="detail-row-label">Pedido</div>
+        <div class="detail-row-value">${escHtml(order.order_ref)}</div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-row-label">Cliente</div>
+        <div class="detail-row-value">${escHtml(order.client_name)}${order.client_phone ? ` · ${escHtml(order.client_phone)}` : ''}</div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-row-label">Estado</div>
+        <div class="detail-row-value">
+          <span class="badge badge-${order.status}">
+            <span class="badge-dot"></span>
+            ${order.status === 'pending' ? 'Pendiente' : 'Confirmado'}
+          </span>
+        </div>
+      </div>
+      ${order.status === 'confirmed' ? `
+      <div class="detail-row">
+        <div class="detail-row-label">Dirección confirmada</div>
+        <div class="detail-row-value">${escHtml(order.address_text || '—')}</div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-row-label">Confirmado el</div>
+        <div class="detail-row-value">${fmtDate(order.confirmed_at)}</div>
+      </div>
+      ` : ''}
+      ${order.notes ? `
+      <div class="detail-row">
+        <div class="detail-row-label">Notas</div>
+        <div class="detail-row-value">${escHtml(order.notes)}</div>
+      </div>` : ''}
+      <div class="detail-row">
+        <div class="detail-row-label">Enlace para el cliente</div>
+        <div class="detail-link">
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${link}</span>
+          <button class="copy-link-btn" onclick="copyLink('${order.token}')">Copiar</button>
+        </div>
+      </div>
+      ${order.status === 'pending' ? `
+      <a href="${waLink}" target="_blank" class="wa-link-btn">
+        <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Enviar por WhatsApp
+      </a>` : ''}
+    `;
+
+    // Fly map to confirmed address
+    if (order.address_lat && order.address_lng) {
+      map.setView([order.address_lat, order.address_lng], 16);
+    }
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function escHtml(str) {
+    return String(str || '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+  }
+
+  function copyLink(token) {
+    const link = `${baseUrl}/address/${token}`;
+    navigator.clipboard.writeText(link).then(() => showToast('Enlace copiado'));
+  }
+
+  function sendWhatsApp(order) {
+    const link = `${baseUrl}/address/${order.token}`;
+    const msg  = encodeURIComponent(
+      `Hola ${order.client_name}, tu pedido *${order.order_ref}* no pudo ser entregado debido a un problema con tu dirección de envío.\n\n` +
+      `Por favor actualiza tu dirección aquí para que podamos enviarte tu SIM card:\n${link}\n\n_Virgin Mobile Colombia_`
+    );
+    const phone = order.client_phone ? order.client_phone.replace(/\D/g,'') : '';
+    const url = phone ? `https://wa.me/57${phone}?text=${msg}` : `https://wa.me/?text=${msg}`;
+    window.open(url, '_blank');
+  }
+
+  let toastTimer;
+  function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+  }
+
+  // ── Tabs ─────────────────────────────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeStatus = btn.dataset.status;
+      loadOrders();
+    });
+  });
+
+  document.getElementById('btn-filter').addEventListener('click', loadOrders);
+
+  // ── Modal ────────────────────────────────────────────────────────────────
+  function openModal()  { document.getElementById('modal-overlay').classList.add('open'); }
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+    ['field-order-ref','field-client-name','field-client-phone','field-notes']
+      .forEach(id => { document.getElementById(id).value = ''; });
+  }
+
+  document.getElementById('btn-new-order').addEventListener('click', openModal);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('btn-cancel').addEventListener('click', closeModal);
+  document.getElementById('modal-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal-overlay')) closeModal();
+  });
+
+  document.getElementById('btn-save-order').addEventListener('click', async () => {
+    const orderRef   = document.getElementById('field-order-ref').value.trim();
+    const clientName = document.getElementById('field-client-name').value.trim();
+    const phone      = document.getElementById('field-client-phone').value.trim();
+    const notes      = document.getElementById('field-notes').value.trim();
+
+    if (!orderRef || !clientName) {
+      showToast('Completa los campos obligatorios'); return;
+    }
+
+    const btn = document.getElementById('btn-save-order');
+    btn.disabled = true; btn.textContent = 'Creando…';
+
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_ref: orderRef, client_name: clientName, client_phone: phone || null, notes: notes || null }),
+      });
+      if (res.ok) {
+        const order = await res.json();
+        closeModal();
+        await loadOrders();
+        await loadStats();
+        selectOrder(orders.find(o => o.id === order.id) || order);
+        showToast('Pedido creado correctamente');
+      } else {
+        showToast('Error al crear el pedido');
+      }
+    } catch(e) {
+      showToast('Error de conexión');
+    }
+    btn.disabled = false; btn.textContent = 'Crear pedido';
+  });
+
+  // ── Auto-refresh every 30s ───────────────────────────────────────────────
+  setInterval(() => { loadOrders(); loadStats(); }, 30000);
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  loadStats();
+  loadOrders();
+</script>
+</body>
+</html>
