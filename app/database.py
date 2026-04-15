@@ -5,7 +5,21 @@ import psycopg2.extras
 from dotenv import load_dotenv
 
 load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Railway may expose the URL under different names depending on the plugin version
+DATABASE_URL = (
+    os.getenv("DATABASE_URL")
+    or os.getenv("POSTGRES_URL")
+    or os.getenv("POSTGRESQL_URL")
+    or os.getenv("DATABASE_PRIVATE_URL")
+    or os.getenv("POSTGRES_PRIVATE_URL")
+)
+
+if not DATABASE_URL:
+    _db_vars = [k for k in os.environ if "postgres" in k.lower() or "database" in k.lower() or "pg" in k.lower()]
+    raise RuntimeError(
+        f"DATABASE_URL is not set. DB-related env vars found: {_db_vars or 'none'}"
+    )
 
 
 def get_conn():
