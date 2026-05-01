@@ -498,14 +498,8 @@
                 <th>Guía</th>
                 <th>Destinatario</th>
                 <th>Teléfono</th>
-                <th>Estado</th>
-                <th>Novedad</th>
-                <th>Fecha novedad</th>
-                <th>Dir. actual</th>
                 <th>Ciudad</th>
-                <th>Correo</th>
-                <th>Observaciones</th>
-                <th>Dir. confirmada</th>
+                <th>Estado</th>
                 <th>Creado</th>
                 <th>Acciones</th>
               </tr>
@@ -715,20 +709,12 @@
         <td><strong>${escHtml(o.order_ref)}</strong></td>
         <td class="client-name">${escHtml(o.client_name)}</td>
         <td style="white-space:nowrap">${escHtml(o.client_phone || '—')}</td>
+        <td>${escHtml(o.ciudad || '—')}</td>
         <td>
           <span class="badge badge-${o.status}">
             <span class="badge-dot"></span>
             ${o.status === 'pending' ? 'Pendiente' : 'Confirmado'}
           </span>
-        </td>
-        <td class="address-cell" title="${escHtml(o.novedad || '')}">${escHtml(o.novedad || '—')}</td>
-        <td style="white-space:nowrap;color:var(--muted);font-size:.8rem">${o.fecha_novedad ? escHtml(o.fecha_novedad) : '—'}</td>
-        <td class="address-cell" title="${escHtml(o.direccion_actual || '')}">${escHtml(o.direccion_actual || '—')}</td>
-        <td>${escHtml(o.ciudad || '—')}</td>
-        <td class="address-cell">${escHtml(o.correo || '—')}</td>
-        <td class="address-cell" title="${escHtml(o.notes || '')}">${escHtml(o.notes || '—')}</td>
-        <td class="address-cell" title="${escHtml(o.address_text || '')}">
-          ${o.address_text ? escHtml(o.address_text) : '<span style="color:var(--muted)">—</span>'}
         </td>
         <td style="white-space:nowrap;color:var(--muted);font-size:.8rem">${fmtDate(o.created_at)}</td>
         <td>
@@ -827,7 +813,7 @@
       ` : ''}
       ${order.notes ? `
       <div class="detail-row">
-        <div class="detail-row-label">Notas</div>
+        <div class="detail-row-label">Observaciones</div>
         <div class="detail-row-value">${escHtml(order.notes)}</div>
       </div>` : ''}
       <div class="detail-row">
