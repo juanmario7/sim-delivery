@@ -62,6 +62,22 @@ def create_order(order_ref: str, client_name: str, client_phone: str | None, not
     return row
 
 
+def create_orders_bulk(orders: list):
+    results = []
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            for o in orders:
+                token = str(uuid.uuid4())
+                cur.execute("""
+                    INSERT INTO orders (order_ref, client_name, client_phone, token, notes)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING *
+                """, (o['order_ref'], o['client_name'], o.get('client_phone'), token, o.get('notes')))
+                results.append(dict(cur.fetchone()))
+        conn.commit()
+    return results
+
+
 def get_order_by_token(token: str):
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:

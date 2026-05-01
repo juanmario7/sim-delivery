@@ -87,6 +87,18 @@ class AddressSubmit(BaseModel):
     lng: Optional[float] = None
 
 
+class OrderBulkItem(BaseModel):
+    order_ref: str
+    client_name: str
+    client_phone: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@app.post("/api/orders/bulk", status_code=201)
+def create_orders_bulk(body: list[OrderBulkItem]):
+    return database.create_orders_bulk([o.model_dump() for o in body])
+
+
 @app.get("/api/address/{token}")
 def get_order_by_token(token: str):
     order = database.get_order_by_token(token)

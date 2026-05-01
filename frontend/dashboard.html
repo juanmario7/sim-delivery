@@ -375,6 +375,42 @@
     }
     .toast.show { opacity: 1; transform: none; }
 
+    /* ── Upload modal ── */
+    .upload-drop {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 32px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      margin-bottom: 16px;
+    }
+    .upload-drop:hover, .upload-drop.drag { border-color: var(--brand); background: #fff5f5; }
+    .upload-drop svg { width: 36px; height: 36px; fill: var(--muted); margin-bottom: 10px; }
+    .upload-drop p { font-size: .875rem; color: var(--muted); }
+    .upload-drop strong { color: var(--brand); }
+    #bulk-file-input { display: none; }
+
+    .preview-wrap { overflow-x: auto; max-height: 300px; overflow-y: auto; margin-bottom: 4px; }
+    .preview-wrap table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+    .preview-wrap thead th {
+      position: sticky; top: 0;
+      background: #fafafa;
+      padding: 8px 10px;
+      text-align: left;
+      font-size: .72rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .preview-wrap tbody td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .preview-wrap tbody tr:last-child td { border-bottom: none; }
+    .upload-summary { font-size: .82rem; color: var(--muted); margin-bottom: 12px; }
+    .upload-summary strong { color: var(--text); }
+
     @media (max-width: 900px) {
       .content-grid { grid-template-columns: 1fr; }
       .stats-grid   { grid-template-columns: repeat(3, 1fr); }
@@ -398,10 +434,16 @@
       <div class="topbar-sub">Virgin Mobile Colombia</div>
     </div>
   </div>
-  <button class="btn-new" id="btn-new-order">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-    Nuevo pedido
-  </button>
+  <div style="display:flex;gap:8px;">
+    <button class="btn-new" id="btn-upload-orders" style="background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.5);">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zm-8 2V5h2v6h1.17L12 13.17 9.83 11H11zm-6 7h14v2H5v-2z"/></svg>
+      Cargar archivo
+    </button>
+    <button class="btn-new" id="btn-new-order">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+      Nuevo pedido
+    </button>
+  </div>
 </header>
 
 <!-- Main -->
@@ -525,10 +567,52 @@
   </div>
 </div>
 
+<!-- Modal: bulk upload -->
+<div class="overlay" id="bulk-modal-overlay">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-header">
+      <span class="modal-title">Cargar pedidos desde archivo</span>
+      <button class="modal-close" id="bulk-modal-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="upload-drop" id="upload-drop" onclick="document.getElementById('bulk-file-input').click()">
+        <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zm-8 2V5h2v6h1.17L12 13.17 9.83 11H11zm-6 7h14v2H5v-2z"/></svg>
+        <p>Arrastra tu archivo aquí o <strong>haz clic para seleccionar</strong></p>
+        <p style="font-size:.75rem;margin-top:6px;">Formatos aceptados: .csv, .xlsx, .xls</p>
+      </div>
+      <input type="file" id="bulk-file-input" accept=".csv,.xlsx,.xls" />
+
+      <div id="bulk-preview" style="display:none;">
+        <p class="upload-summary" id="bulk-summary"></p>
+        <div class="preview-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Guía</th>
+                <th>Destinatario</th>
+                <th>Teléfono</th>
+                <th>Novedad</th>
+                <th>Ciudad</th>
+                <th>Observaciones</th>
+              </tr>
+            </thead>
+            <tbody id="bulk-preview-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="btn-bulk-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="btn-bulk-confirm" disabled>Crear pedidos</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
   let orders = [];
   let selectedOrder = null;
@@ -807,6 +891,136 @@
       showToast('Error de conexión');
     }
     btn.disabled = false; btn.textContent = 'Crear pedido';
+  });
+
+  // ── Bulk upload ──────────────────────────────────────────────────────────
+  let bulkRows = [];
+
+  function openBulkModal() {
+    bulkRows = [];
+    document.getElementById('bulk-preview').style.display = 'none';
+    document.getElementById('btn-bulk-confirm').disabled = true;
+    document.getElementById('bulk-file-input').value = '';
+    document.getElementById('bulk-modal-overlay').classList.add('open');
+  }
+  function closeBulkModal() {
+    document.getElementById('bulk-modal-overlay').classList.remove('open');
+  }
+
+  document.getElementById('btn-upload-orders').addEventListener('click', openBulkModal);
+  document.getElementById('bulk-modal-close').addEventListener('click', closeBulkModal);
+  document.getElementById('btn-bulk-cancel').addEventListener('click', closeBulkModal);
+  document.getElementById('bulk-modal-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('bulk-modal-overlay')) closeBulkModal();
+  });
+
+  // Drag & drop
+  const dropZone = document.getElementById('upload-drop');
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag');
+    const file = e.dataTransfer.files[0];
+    if (file) parseFile(file);
+  });
+
+  document.getElementById('bulk-file-input').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) parseFile(file);
+  });
+
+  function parseFile(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array', raw: false, FS: ';' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      // header:1 gives array of arrays; row 0 = col names, row 1 = format hint, row 2+ = data
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+      // Find header row (first row with GUIA)
+      const headerIdx = rows.findIndex(r => r.some(c => String(c).toUpperCase().includes('GUIA')));
+      if (headerIdx === -1) { showToast('No se encontró la columna GUIA en el archivo'); return; }
+
+      const headers = rows[headerIdx].map(h => String(h).trim().toUpperCase());
+      const col = name => headers.indexOf(name);
+
+      // Skip header row and format-description row (next row if it contains 'AAAA' or 'Alfanumerico')
+      let dataStart = headerIdx + 1;
+      if (rows[dataStart] && rows[dataStart].some(c => String(c).toLowerCase().includes('alfanumerico') || String(c).includes('AAAA'))) {
+        dataStart++;
+      }
+
+      bulkRows = rows.slice(dataStart)
+        .filter(r => r.some(c => String(c).trim() !== ''))  // skip empty rows
+        .map(r => ({
+          order_ref:    String(r[col('GUIA')] || '').trim(),
+          client_name:  String(r[col('DESTINATARIO')] || '').trim(),
+          client_phone: String(r[col('TELEFONO')] || '').trim() || null,
+          novedad:      String(r[col('NOVEDAD')] || '').trim(),
+          ciudad:       String(r[col('CIUDAD')] || '').trim(),
+          observaciones:String(r[col('OBSERVACIONES')] || '').trim(),
+        }))
+        .filter(r => r.order_ref && r.client_name);
+
+      if (bulkRows.length === 0) { showToast('No se encontraron pedidos válidos en el archivo'); return; }
+
+      // Render preview
+      document.getElementById('bulk-summary').innerHTML =
+        `Se encontraron <strong>${bulkRows.length}</strong> pedido${bulkRows.length !== 1 ? 's' : ''} listos para importar.`;
+
+      document.getElementById('bulk-preview-tbody').innerHTML = bulkRows.map(r => `
+        <tr>
+          <td><strong>${escHtml(r.order_ref)}</strong></td>
+          <td>${escHtml(r.client_name)}</td>
+          <td>${escHtml(r.client_phone || '—')}</td>
+          <td>${escHtml(r.novedad || '—')}</td>
+          <td>${escHtml(r.ciudad || '—')}</td>
+          <td>${escHtml(r.observaciones || '—')}</td>
+        </tr>
+      `).join('');
+
+      document.getElementById('bulk-preview').style.display = 'block';
+      document.getElementById('btn-bulk-confirm').disabled = false;
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  document.getElementById('btn-bulk-confirm').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-bulk-confirm');
+    btn.disabled = true; btn.textContent = 'Importando…';
+
+    const payload = bulkRows.map(r => ({
+      order_ref:    r.order_ref,
+      client_name:  r.client_name,
+      client_phone: r.client_phone || null,
+      notes: [
+        r.novedad      ? `Novedad: ${r.novedad}`      : '',
+        r.ciudad       ? `Ciudad: ${r.ciudad}`         : '',
+        r.observaciones,
+      ].filter(Boolean).join(' | ') || null,
+    }));
+
+    try {
+      const res = await fetch('/api/orders/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        closeBulkModal();
+        await loadOrders();
+        await loadStats();
+        showToast(`${created.length} pedido${created.length !== 1 ? 's' : ''} importado${created.length !== 1 ? 's' : ''} correctamente`);
+      } else {
+        showToast('Error al importar los pedidos');
+      }
+    } catch(e) {
+      showToast('Error de conexión');
+    }
+    btn.disabled = false; btn.textContent = 'Crear pedidos';
   });
 
   // ── Auto-refresh every 30s ───────────────────────────────────────────────
