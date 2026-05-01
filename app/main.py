@@ -57,12 +57,21 @@ class OrderCreate(BaseModel):
     order_ref: str
     client_name: str
     client_phone: Optional[str] = None
+    novedad: Optional[str] = None
+    fecha_novedad: Optional[str] = None
+    direccion_actual: Optional[str] = None
+    ciudad: Optional[str] = None
+    correo: Optional[str] = None
     notes: Optional[str] = None
 
 
 @app.post("/api/orders", status_code=201)
 def create_order(body: OrderCreate):
-    return database.create_order(body.order_ref, body.client_name, body.client_phone, body.notes)
+    return database.create_order(
+        body.order_ref, body.client_name, body.client_phone,
+        body.novedad, body.fecha_novedad, body.direccion_actual,
+        body.ciudad, body.correo, body.notes,
+    )
 
 
 @app.get("/api/orders")
@@ -91,6 +100,11 @@ class OrderBulkItem(BaseModel):
     order_ref: str
     client_name: str
     client_phone: Optional[str] = None
+    novedad: Optional[str] = None
+    fecha_novedad: Optional[str] = None
+    direccion_actual: Optional[str] = None
+    ciudad: Optional[str] = None
+    correo: Optional[str] = None
     notes: Optional[str] = None
 
 

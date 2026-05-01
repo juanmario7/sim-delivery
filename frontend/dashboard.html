@@ -542,22 +542,42 @@
       <span class="modal-title">Nuevo pedido</span>
       <button class="modal-close" id="modal-close">×</button>
     </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label>Número de pedido <span class="req">*</span></label>
-        <input type="text" id="field-order-ref" placeholder="Ej: ORD-20240415-001" />
+    <div class="modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px;">
+      <div class="form-group" style="grid-column:1/2">
+        <label>Guía <span class="req">*</span></label>
+        <input type="text" id="field-order-ref" placeholder="Alfanumérico (15)" />
+      </div>
+      <div class="form-group" style="grid-column:2/3">
+        <label>Destinatario <span class="req">*</span></label>
+        <input type="text" id="field-client-name" placeholder="Nombre completo" />
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Novedad</label>
+        <textarea id="field-novedad" placeholder="Descripción de la novedad de entrega…" style="min-height:60px;"></textarea>
       </div>
       <div class="form-group">
-        <label>Nombre del cliente <span class="req">*</span></label>
-        <input type="text" id="field-client-name" placeholder="Nombre completo" />
+        <label>Fecha novedad</label>
+        <input type="date" id="field-fecha-novedad" />
       </div>
       <div class="form-group">
         <label>Teléfono</label>
         <input type="tel" id="field-client-phone" placeholder="Ej: 3001234567" />
       </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Dirección actual</label>
+        <input type="text" id="field-direccion-actual" placeholder="Dirección registrada actualmente" />
+      </div>
       <div class="form-group">
-        <label>Notas internas</label>
-        <textarea id="field-notes" placeholder="Información relevante para el equipo…"></textarea>
+        <label>Ciudad</label>
+        <input type="text" id="field-ciudad" placeholder="Ej: Bogotá" />
+      </div>
+      <div class="form-group">
+        <label>Correo</label>
+        <input type="email" id="field-correo" placeholder="cliente@correo.com" />
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Observaciones</label>
+        <textarea id="field-notes" placeholder="Información adicional para el equipo…" style="min-height:60px;"></textarea>
       </div>
     </div>
     <div class="modal-footer">
@@ -752,9 +772,29 @@
         <div class="detail-row-value">${escHtml(order.order_ref)}</div>
       </div>
       <div class="detail-row">
-        <div class="detail-row-label">Cliente</div>
+        <div class="detail-row-label">Destinatario</div>
         <div class="detail-row-value">${escHtml(order.client_name)}${order.client_phone ? ` · ${escHtml(order.client_phone)}` : ''}</div>
       </div>
+      ${order.correo ? `
+      <div class="detail-row">
+        <div class="detail-row-label">Correo</div>
+        <div class="detail-row-value">${escHtml(order.correo)}</div>
+      </div>` : ''}
+      ${order.ciudad ? `
+      <div class="detail-row">
+        <div class="detail-row-label">Ciudad</div>
+        <div class="detail-row-value">${escHtml(order.ciudad)}</div>
+      </div>` : ''}
+      ${order.novedad ? `
+      <div class="detail-row">
+        <div class="detail-row-label">Novedad</div>
+        <div class="detail-row-value">${escHtml(order.novedad)}${order.fecha_novedad ? ` <span style="color:var(--muted);font-size:.82rem;">(${order.fecha_novedad})</span>` : ''}</div>
+      </div>` : ''}
+      ${order.direccion_actual ? `
+      <div class="detail-row">
+        <div class="detail-row-label">Dirección actual</div>
+        <div class="detail-row-value">${escHtml(order.direccion_actual)}</div>
+      </div>` : ''}
       <div class="detail-row">
         <div class="detail-row-label">Estado</div>
         <div class="detail-row-value">
@@ -847,7 +887,8 @@
   function openModal()  { document.getElementById('modal-overlay').classList.add('open'); }
   function closeModal() {
     document.getElementById('modal-overlay').classList.remove('open');
-    ['field-order-ref','field-client-name','field-client-phone','field-notes']
+    ['field-order-ref','field-client-name','field-novedad','field-fecha-novedad',
+     'field-client-phone','field-direccion-actual','field-ciudad','field-correo','field-notes']
       .forEach(id => { document.getElementById(id).value = ''; });
   }
 
@@ -859,10 +900,15 @@
   });
 
   document.getElementById('btn-save-order').addEventListener('click', async () => {
-    const orderRef   = document.getElementById('field-order-ref').value.trim();
-    const clientName = document.getElementById('field-client-name').value.trim();
-    const phone      = document.getElementById('field-client-phone').value.trim();
-    const notes      = document.getElementById('field-notes').value.trim();
+    const orderRef        = document.getElementById('field-order-ref').value.trim();
+    const clientName      = document.getElementById('field-client-name').value.trim();
+    const novedad         = document.getElementById('field-novedad').value.trim();
+    const fechaNovedad    = document.getElementById('field-fecha-novedad').value.trim();
+    const phone           = document.getElementById('field-client-phone').value.trim();
+    const direccionActual = document.getElementById('field-direccion-actual').value.trim();
+    const ciudad          = document.getElementById('field-ciudad').value.trim();
+    const correo          = document.getElementById('field-correo').value.trim();
+    const notes           = document.getElementById('field-notes').value.trim();
 
     if (!orderRef || !clientName) {
       showToast('Completa los campos obligatorios'); return;
@@ -875,7 +921,17 @@
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order_ref: orderRef, client_name: clientName, client_phone: phone || null, notes: notes || null }),
+        body: JSON.stringify({
+          order_ref:        orderRef,
+          client_name:      clientName,
+          client_phone:     phone || null,
+          novedad:          novedad || null,
+          fecha_novedad:    fechaNovedad || null,
+          direccion_actual: direccionActual || null,
+          ciudad:           ciudad || null,
+          correo:           correo || null,
+          notes:            notes || null,
+        }),
       });
       if (res.ok) {
         const order = await res.json();
@@ -955,12 +1011,15 @@
       bulkRows = rows.slice(dataStart)
         .filter(r => r.some(c => String(c).trim() !== ''))  // skip empty rows
         .map(r => ({
-          order_ref:    String(r[col('GUIA')] || '').trim(),
-          client_name:  String(r[col('DESTINATARIO')] || '').trim(),
-          client_phone: String(r[col('TELEFONO')] || '').trim() || null,
-          novedad:      String(r[col('NOVEDAD')] || '').trim(),
-          ciudad:       String(r[col('CIUDAD')] || '').trim(),
-          observaciones:String(r[col('OBSERVACIONES')] || '').trim(),
+          order_ref:        String(r[col('GUIA')] || '').trim(),
+          client_name:      String(r[col('DESTINATARIO')] || '').trim(),
+          client_phone:     String(r[col('TELEFONO')] || '').trim() || null,
+          novedad:          String(r[col('NOVEDAD')] || '').trim() || null,
+          fecha_novedad:    String(r[col('FECHA NOVEDAD')] || '').trim() || null,
+          direccion_actual: String(r[col('DIRECCION')] || '').trim() || null,
+          ciudad:           String(r[col('CIUDAD')] || '').trim() || null,
+          correo:           String(r[col('CORREO')] || '').trim() || null,
+          observaciones:    String(r[col('OBSERVACIONES')] || '').trim() || null,
         }))
         .filter(r => r.order_ref && r.client_name);
 
@@ -992,14 +1051,15 @@
     btn.disabled = true; btn.textContent = 'Importando…';
 
     const payload = bulkRows.map(r => ({
-      order_ref:    r.order_ref,
-      client_name:  r.client_name,
-      client_phone: r.client_phone || null,
-      notes: [
-        r.novedad      ? `Novedad: ${r.novedad}`      : '',
-        r.ciudad       ? `Ciudad: ${r.ciudad}`         : '',
-        r.observaciones,
-      ].filter(Boolean).join(' | ') || null,
+      order_ref:        r.order_ref,
+      client_name:      r.client_name,
+      client_phone:     r.client_phone || null,
+      novedad:          r.novedad || null,
+      fecha_novedad:    r.fecha_novedad || null,
+      direccion_actual: r.direccion_actual || null,
+      ciudad:           r.ciudad || null,
+      correo:           r.correo || null,
+      notes:            r.observaciones || null,
     }));
 
     try {

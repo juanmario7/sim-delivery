@@ -31,32 +31,52 @@ def init_db():
         with conn.cursor() as cur:
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS orders (
-                    id          SERIAL PRIMARY KEY,
-                    order_ref   VARCHAR(100) NOT NULL,
-                    client_name VARCHAR(200) NOT NULL,
-                    client_phone VARCHAR(20),
-                    token       UUID UNIQUE NOT NULL,
-                    status      VARCHAR(20) NOT NULL DEFAULT 'pending',
-                    notes       TEXT,
-                    address_text TEXT,
-                    address_lat  DOUBLE PRECISION,
-                    address_lng  DOUBLE PRECISION,
-                    confirmed_at TIMESTAMP WITH TIME ZONE,
-                    created_at   TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                    id              SERIAL PRIMARY KEY,
+                    order_ref       VARCHAR(100) NOT NULL,
+                    client_name     VARCHAR(200) NOT NULL,
+                    client_phone    VARCHAR(20),
+                    token           UUID UNIQUE NOT NULL,
+                    status          VARCHAR(20) NOT NULL DEFAULT 'pending',
+                    novedad         TEXT,
+                    fecha_novedad   DATE,
+                    direccion_actual TEXT,
+                    ciudad          VARCHAR(100),
+                    correo          VARCHAR(100),
+                    notes           TEXT,
+                    address_text    TEXT,
+                    address_lat     DOUBLE PRECISION,
+                    address_lng     DOUBLE PRECISION,
+                    confirmed_at    TIMESTAMP WITH TIME ZONE,
+                    created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
                 )
             """)
+            # Migrate existing tables
+            for col, definition in [
+                ("novedad",          "TEXT"),
+                ("fecha_novedad",    "DATE"),
+                ("direccion_actual", "TEXT"),
+                ("ciudad",           "VARCHAR(100)"),
+                ("correo",           "VARCHAR(100)"),
+            ]:
+                cur.execute(f"""
+                    ALTER TABLE orders ADD COLUMN IF NOT EXISTS {col} {definition}
+                """)
         conn.commit()
 
 
-def create_order(order_ref: str, client_name: str, client_phone: str | None, notes: str | None):
+def create_order(order_ref, client_name, client_phone=None, novedad=None,
+                 fecha_novedad=None, direccion_actual=None, ciudad=None, correo=None, notes=None):
     token = str(uuid.uuid4())
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
-                INSERT INTO orders (order_ref, client_name, client_phone, token, notes)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO orders
+                    (order_ref, client_name, client_phone, token,
+                     novedad, fecha_novedad, direccion_actual, ciudad, correo, notes)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING *
-            """, (order_ref, client_name, client_phone, token, notes))
+            """, (order_ref, client_name, client_phone, token,
+                  novedad, fecha_novedad, direccion_actual, ciudad, correo, notes))
             row = dict(cur.fetchone())
         conn.commit()
     return row
@@ -69,10 +89,14 @@ def create_orders_bulk(orders: list):
             for o in orders:
                 token = str(uuid.uuid4())
                 cur.execute("""
-                    INSERT INTO orders (order_ref, client_name, client_phone, token, notes)
-                    VALUES (%s, %s, %s, %s, %s)
+                    INSERT INTO orders
+                        (order_ref, client_name, client_phone, token,
+                         novedad, fecha_novedad, direccion_actual, ciudad, correo, notes)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING *
-                """, (o['order_ref'], o['client_name'], o.get('client_phone'), token, o.get('notes')))
+                """, (o['order_ref'], o['client_name'], o.get('client_phone'), token,
+                      o.get('novedad'), o.get('fecha_novedad'), o.get('direccion_actual'),
+                      o.get('ciudad'), o.get('correo'), o.get('notes')))
                 results.append(dict(cur.fetchone()))
         conn.commit()
     return results
