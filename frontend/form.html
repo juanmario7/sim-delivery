@@ -330,17 +330,14 @@
 
     await new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${cfg.maps_api_key}&loading=async&region=CO&language=es`;
-      script.async = true;
-      script.defer = true;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${cfg.maps_api_key}&libraries=places&region=CO&language=es`;
       script.onload = resolve;
       script.onerror = reject;
       document.head.appendChild(script);
     });
 
-    const { Autocomplete } = await google.maps.importLibrary('places');
     const input = document.getElementById('address-input');
-    autocomplete = new Autocomplete(input, {
+    autocomplete = new google.maps.places.Autocomplete(input, {
       componentRestrictions: { country: 'co' },
       fields: ['formatted_address', 'geometry'],
     });
