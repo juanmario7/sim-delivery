@@ -717,6 +717,7 @@
 
       <div id="bulk-preview" style="display:none;">
         <p class="upload-summary" id="bulk-summary"></p>
+        <p id="bulk-error" style="display:none;font-size:.82rem;color:#d32f2f;background:#fdecea;border-left:3px solid #d32f2f;padding:10px 12px;border-radius:6px;margin-bottom:12px;word-break:break-word;"></p>
         <div class="preview-wrap">
           <table>
             <thead>
@@ -1215,6 +1216,7 @@
     document.getElementById('bulk-preview').style.display = 'none';
     document.getElementById('btn-bulk-confirm').disabled = true;
     document.getElementById('bulk-file-input').value = '';
+    document.getElementById('bulk-error').style.display = 'none';
     document.getElementById('bulk-modal-overlay').classList.add('open');
   }
   function closeBulkModal() {
@@ -1245,6 +1247,7 @@
   });
 
   function parseFile(file) {
+    document.getElementById('bulk-error').style.display = 'none';
     const reader = new FileReader();
     reader.onload = e => {
       const data = new Uint8Array(e.target.result);
@@ -1326,17 +1329,22 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      const errEl = document.getElementById('bulk-error');
       if (res.ok) {
+        errEl.style.display = 'none';
         const created = await res.json();
         closeBulkModal();
         await loadOrders();
         await loadStats();
         showToast(`${created.length} pedido${created.length !== 1 ? 's' : ''} importado${created.length !== 1 ? 's' : ''} correctamente`);
       } else {
-        showToast('Error al importar los pedidos');
+        const err = await res.json().catch(() => ({ detail: 'Error desconocido' }));
+        errEl.textContent = `Error: ${err.detail || 'No se pudieron importar los pedidos'}`;
+        errEl.style.display = 'block';
       }
     } catch(e) {
-      showToast('Error de conexión');
+      document.getElementById('bulk-error').textContent = `Error de conexión: ${e.message}`;
+      document.getElementById('bulk-error').style.display = 'block';
     }
     btn.disabled = false; btn.textContent = 'Crear pedidos';
   });

@@ -2,6 +2,7 @@ import os
 import uuid
 import psycopg2
 import psycopg2.extras
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
