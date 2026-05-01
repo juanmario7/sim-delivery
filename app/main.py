@@ -117,6 +117,37 @@ def update_order(order_id: int, body: OrderUpdate):
     return order
 
 
+# ── WhatsApp queue ───────────────────────────────────────────────────────────
+
+class WhatsAppQueueRequest(BaseModel):
+    order_ids: list[int]
+
+
+class WhatsAppStatusUpdate(BaseModel):
+    status: str   # 'sent' | 'failed'
+
+
+@app.post("/api/whatsapp-queue", status_code=201)
+def enqueue_whatsapp(body: WhatsAppQueueRequest):
+    results = database.queue_whatsapp(body.order_ids, BASE_URL)
+    if not results:
+        raise HTTPException(status_code=400, detail="Ningún pedido válido para encolar (verifica que tengan teléfono).")
+    return results
+
+
+@app.get("/api/whatsapp-queue")
+def get_whatsapp_queue(status: Optional[str] = None):
+    return database.list_whatsapp_queue(status)
+
+
+@app.put("/api/whatsapp-queue/{item_id}")
+def update_whatsapp_status(item_id: int, body: WhatsAppStatusUpdate):
+    item = database.update_whatsapp_status(item_id, body.status)
+    if not item:
+        raise HTTPException(status_code=404, detail="Registro no encontrado")
+    return item
+
+
 class OrderBulkItem(BaseModel):
     order_ref: str
     client_name: str

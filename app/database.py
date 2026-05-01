@@ -61,6 +61,19 @@ def init_db():
                 cur.execute(f"""
                     ALTER TABLE orders ADD COLUMN IF NOT EXISTS {col} {definition}
                 """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS whatsapp_queue (
+                    id          SERIAL PRIMARY KEY,
+                    order_id    INTEGER NOT NULL REFERENCES orders(id),
+                    order_ref   VARCHAR(100) NOT NULL,
+                    client_name VARCHAR(200) NOT NULL,
+                    phone       VARCHAR(20) NOT NULL,
+                    form_link   TEXT NOT NULL,
+                    status      VARCHAR(20) NOT NULL DEFAULT 'pending',
+                    queued_at   TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    sent_at     TIMESTAMP WITH TIME ZONE
+                )
+            """)
         conn.commit()
 
 
@@ -178,14 +191,58 @@ def list_orders(status: str | None = None, date_from: str | None = None, date_to
     return [dict(r) for r in rows]
 
 
+def queue_whatsapp(order_ids: list, base_url: str):
+    results = []
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            for oid in order_ids:
+                cur.execute("SELECT * FROM orders WHERE id = %s", (oid,))
+                o = cur.fetchone()
+                if not o or not o['client_phone']:
+                    continue
+                form_link = f"{base_url}/address/{o['token']}"
+                cur.execute("""
+                    INSERT INTO whatsapp_queue (order_id, order_ref, client_name, phone, form_link)
+                    VALUES (%s, %s, %s, %s, %s) RETURNING *
+                """, (o['id'], o['order_ref'], o['client_name'], o['client_phone'], form_link))
+                results.append(dict(cur.fetchone()))
+                cur.execute("UPDATE orders SET status = 'contactado' WHERE id = %s", (oid,))
+        conn.commit()
+    return results
+
+
+def list_whatsapp_queue(status: str | None = None):
+    where = "WHERE status = %s" if status else ""
+    params = [status] if status else []
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(f"SELECT * FROM whatsapp_queue {where} ORDER BY queued_at ASC", params)
+            rows = cur.fetchall()
+    return [dict(r) for r in rows]
+
+
+def update_whatsapp_status(item_id: int, status: str):
+    sent_at = "NOW()" if status == 'sent' else "NULL"
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(f"""
+                UPDATE whatsapp_queue SET status = %s, sent_at = {sent_at}
+                WHERE id = %s RETURNING *
+            """, (status, item_id))
+            row = cur.fetchone()
+        conn.commit()
+    return dict(row) if row else None
+
+
 def get_stats():
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 SELECT
-                    COUNT(*)                                          AS total,
-                    COUNT(*) FILTER (WHERE status = 'pending')       AS pending,
-                    COUNT(*) FILTER (WHERE status = 'confirmed')     AS confirmed
+                    COUNT(*)                                              AS total,
+                    COUNT(*) FILTER (WHERE status = 'pending')           AS pending,
+                    COUNT(*) FILTER (WHERE status = 'contactado')        AS contactado,
+                    COUNT(*) FILTER (WHERE status = 'confirmed')         AS confirmed
                 FROM orders
             """)
             return dict(cur.fetchone())
