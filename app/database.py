@@ -79,10 +79,21 @@ def init_db():
 
 
 def _blank_to_none(v):
-    """Convert empty/whitespace strings to None (safe for DATE/numeric columns)."""
     if isinstance(v, str):
         return v.strip() or None
     return v
+
+
+def _safe_date(v):
+    """Parse common date formats into YYYY-MM-DD, or return None if invalid."""
+    if not v or not isinstance(v, str) or not v.strip():
+        return None
+    for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%Y/%m/%d', '%d-%m-%Y'):
+        try:
+            return datetime.strptime(v.strip(), fmt).date().isoformat()
+        except ValueError:
+            continue
+    return None  # unrecognized format → store as NULL
 
 
 def create_order(order_ref, client_name, client_phone=None, novedad=None,
@@ -97,7 +108,7 @@ def create_order(order_ref, client_name, client_phone=None, novedad=None,
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING *
             """, (order_ref, client_name, _blank_to_none(client_phone), token,
-                  _blank_to_none(novedad), _blank_to_none(fecha_novedad),
+                  _blank_to_none(novedad), _safe_date(fecha_novedad),
                   _blank_to_none(direccion_actual), _blank_to_none(ciudad),
                   _blank_to_none(correo), _blank_to_none(notes)))
             row = dict(cur.fetchone())
@@ -120,7 +131,7 @@ def create_orders_bulk(orders: list):
                 """, (o['order_ref'], o['client_name'],
                       _blank_to_none(o.get('client_phone')), token,
                       _blank_to_none(o.get('novedad')),
-                      _blank_to_none(o.get('fecha_novedad')),
+                      _safe_date(o.get('fecha_novedad')),
                       _blank_to_none(o.get('direccion_actual')),
                       _blank_to_none(o.get('ciudad')),
                       _blank_to_none(o.get('correo')),
@@ -138,7 +149,8 @@ def update_order(order_id: int, fields: dict):
     for k in editable:
         if k in fields:
             set_clauses.append(f"{k} = %s")
-            params.append(fields[k])
+            v = _safe_date(fields[k]) if k == 'fecha_novedad' else _blank_to_none(fields[k])
+            params.append(v)
 
     if not set_clauses:
         return None
