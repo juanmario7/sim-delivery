@@ -588,6 +588,68 @@
   </div>
 </div>
 
+<!-- Modal: edit order -->
+<div class="overlay" id="edit-modal-overlay">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <span class="modal-title">Editar pedido</span>
+      <button class="modal-close" id="edit-modal-close">×</button>
+    </div>
+    <div class="modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px;">
+      <div class="form-group" style="grid-column:1/2">
+        <label>Guía <span class="req">*</span></label>
+        <input type="text" id="edit-order-ref" />
+      </div>
+      <div class="form-group" style="grid-column:2/3">
+        <label>Destinatario <span class="req">*</span></label>
+        <input type="text" id="edit-client-name" />
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Novedad</label>
+        <textarea id="edit-novedad" style="min-height:60px;"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Fecha novedad</label>
+        <input type="date" id="edit-fecha-novedad" />
+      </div>
+      <div class="form-group">
+        <label>Teléfono</label>
+        <input type="tel" id="edit-client-phone" />
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Dirección actual</label>
+        <input type="text" id="edit-direccion-actual" />
+      </div>
+      <div class="form-group">
+        <label>Ciudad</label>
+        <input type="text" id="edit-ciudad" />
+      </div>
+      <div class="form-group">
+        <label>Correo</label>
+        <input type="email" id="edit-correo" />
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Observaciones</label>
+        <textarea id="edit-notes" style="min-height:60px;"></textarea>
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Estado</label>
+        <select id="edit-status" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:7px;font-size:.9rem;background:#fafafa;color:var(--text);outline:none;">
+          <option value="pending">Pendiente</option>
+          <option value="confirmed">Confirmado</option>
+        </select>
+        <p id="edit-status-warning" style="display:none;font-size:.78rem;color:#d32f2f;margin-top:6px;">
+          ⚠️ Cambiar a Pendiente borrará la dirección confirmada y el pedido quedará activo nuevamente.
+        </p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="btn-edit-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="btn-edit-save">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: bulk upload -->
 <div class="overlay" id="bulk-modal-overlay">
   <div class="modal" style="max-width:700px;">
@@ -816,6 +878,12 @@
         <div class="detail-row-label">Observaciones</div>
         <div class="detail-row-value">${escHtml(order.notes)}</div>
       </div>` : ''}
+      <div style="margin-bottom:14px;">
+        <button class="btn btn-ghost" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;" onclick="openEditModal()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm17.71-10.21a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+          Editar pedido
+        </button>
+      </div>
       <div class="detail-row">
         <div class="detail-row-label">Enlace para el cliente</div>
         <div class="detail-link">
@@ -944,6 +1012,82 @@
       showToast('Error de conexión');
     }
     btn.disabled = false; btn.textContent = 'Crear pedido';
+  });
+
+  // ── Edit order ───────────────────────────────────────────────────────────
+  function openEditModal() {
+    if (!selectedOrder) return;
+    const o = selectedOrder;
+    document.getElementById('edit-order-ref').value        = o.order_ref || '';
+    document.getElementById('edit-client-name').value      = o.client_name || '';
+    document.getElementById('edit-novedad').value          = o.novedad || '';
+    document.getElementById('edit-fecha-novedad').value    = o.fecha_novedad || '';
+    document.getElementById('edit-client-phone').value     = o.client_phone || '';
+    document.getElementById('edit-direccion-actual').value = o.direccion_actual || '';
+    document.getElementById('edit-ciudad').value           = o.ciudad || '';
+    document.getElementById('edit-correo').value           = o.correo || '';
+    document.getElementById('edit-notes').value            = o.notes || '';
+    document.getElementById('edit-status').value           = o.status;
+    document.getElementById('edit-status-warning').style.display = 'none';
+    document.getElementById('edit-modal-overlay').classList.add('open');
+  }
+
+  function closeEditModal() {
+    document.getElementById('edit-modal-overlay').classList.remove('open');
+  }
+
+  document.getElementById('edit-modal-close').addEventListener('click', closeEditModal);
+  document.getElementById('btn-edit-cancel').addEventListener('click', closeEditModal);
+  document.getElementById('edit-modal-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('edit-modal-overlay')) closeEditModal();
+  });
+
+  document.getElementById('edit-status').addEventListener('change', function() {
+    const warn = document.getElementById('edit-status-warning');
+    warn.style.display = (this.value === 'pending' && selectedOrder?.status === 'confirmed') ? 'block' : 'none';
+  });
+
+  document.getElementById('btn-edit-save').addEventListener('click', async () => {
+    const orderRef   = document.getElementById('edit-order-ref').value.trim();
+    const clientName = document.getElementById('edit-client-name').value.trim();
+    if (!orderRef || !clientName) { showToast('Guía y Destinatario son obligatorios'); return; }
+
+    const btn = document.getElementById('btn-edit-save');
+    btn.disabled = true; btn.textContent = 'Guardando…';
+
+    const payload = {
+      order_ref:        orderRef,
+      client_name:      clientName,
+      client_phone:     document.getElementById('edit-client-phone').value.trim() || null,
+      novedad:          document.getElementById('edit-novedad').value.trim() || null,
+      fecha_novedad:    document.getElementById('edit-fecha-novedad').value || null,
+      direccion_actual: document.getElementById('edit-direccion-actual').value.trim() || null,
+      ciudad:           document.getElementById('edit-ciudad').value.trim() || null,
+      correo:           document.getElementById('edit-correo').value.trim() || null,
+      notes:            document.getElementById('edit-notes').value.trim() || null,
+      status:           document.getElementById('edit-status').value,
+    };
+
+    try {
+      const res = await fetch(`/api/orders/${selectedOrder.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        closeEditModal();
+        await loadOrders();
+        await loadStats();
+        selectOrder(orders.find(o => o.id === updated.id) || updated);
+        showToast('Pedido actualizado correctamente');
+      } else {
+        showToast('Error al actualizar el pedido');
+      }
+    } catch(e) {
+      showToast('Error de conexión');
+    }
+    btn.disabled = false; btn.textContent = 'Guardar cambios';
   });
 
   // ── Bulk upload ──────────────────────────────────────────────────────────

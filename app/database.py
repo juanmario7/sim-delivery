@@ -102,6 +102,36 @@ def create_orders_bulk(orders: list):
     return results
 
 
+def update_order(order_id: int, fields: dict):
+    editable = ['order_ref', 'client_name', 'client_phone', 'novedad', 'fecha_novedad',
+                'direccion_actual', 'ciudad', 'correo', 'notes', 'status']
+    set_clauses = []
+    params = []
+    for k in editable:
+        if k in fields:
+            set_clauses.append(f"{k} = %s")
+            params.append(fields[k])
+
+    if not set_clauses:
+        return None
+
+    # Reverting to pending clears confirmed address
+    if fields.get('status') == 'pending':
+        set_clauses += ['address_text = NULL', 'address_lat = NULL',
+                        'address_lng = NULL', 'confirmed_at = NULL']
+
+    params.append(order_id)
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                f"UPDATE orders SET {', '.join(set_clauses)} WHERE id = %s RETURNING *",
+                params,
+            )
+            row = cur.fetchone()
+        conn.commit()
+    return dict(row) if row else None
+
+
 def get_order_by_token(token: str):
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:

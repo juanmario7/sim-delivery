@@ -96,6 +96,27 @@ class AddressSubmit(BaseModel):
     lng: Optional[float] = None
 
 
+class OrderUpdate(BaseModel):
+    order_ref: Optional[str] = None
+    client_name: Optional[str] = None
+    client_phone: Optional[str] = None
+    novedad: Optional[str] = None
+    fecha_novedad: Optional[str] = None
+    direccion_actual: Optional[str] = None
+    ciudad: Optional[str] = None
+    correo: Optional[str] = None
+    notes: Optional[str] = None
+    status: Optional[str] = None
+
+
+@app.put("/api/orders/{order_id}")
+def update_order(order_id: int, body: OrderUpdate):
+    order = database.update_order(order_id, body.model_dump(exclude_unset=True))
+    if not order:
+        raise HTTPException(status_code=404, detail="Pedido no encontrado")
+    return order
+
+
 class OrderBulkItem(BaseModel):
     order_ref: str
     client_name: str
