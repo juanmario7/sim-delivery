@@ -162,7 +162,10 @@ class OrderBulkItem(BaseModel):
 
 @app.post("/api/orders/bulk", status_code=201)
 def create_orders_bulk(body: list[OrderBulkItem]):
-    return database.create_orders_bulk([o.model_dump() for o in body])
+    try:
+        return database.create_orders_bulk([o.model_dump() for o in body])
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/api/address/{token}")

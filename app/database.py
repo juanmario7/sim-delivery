@@ -77,6 +77,13 @@ def init_db():
         conn.commit()
 
 
+def _blank_to_none(v):
+    """Convert empty/whitespace strings to None (safe for DATE/numeric columns)."""
+    if isinstance(v, str):
+        return v.strip() or None
+    return v
+
+
 def create_order(order_ref, client_name, client_phone=None, novedad=None,
                  fecha_novedad=None, direccion_actual=None, ciudad=None, correo=None, notes=None):
     token = str(uuid.uuid4())
@@ -88,8 +95,10 @@ def create_order(order_ref, client_name, client_phone=None, novedad=None,
                      novedad, fecha_novedad, direccion_actual, ciudad, correo, notes)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING *
-            """, (order_ref, client_name, client_phone, token,
-                  novedad, fecha_novedad, direccion_actual, ciudad, correo, notes))
+            """, (order_ref, client_name, _blank_to_none(client_phone), token,
+                  _blank_to_none(novedad), _blank_to_none(fecha_novedad),
+                  _blank_to_none(direccion_actual), _blank_to_none(ciudad),
+                  _blank_to_none(correo), _blank_to_none(notes)))
             row = dict(cur.fetchone())
         conn.commit()
     return row
@@ -107,9 +116,14 @@ def create_orders_bulk(orders: list):
                          novedad, fecha_novedad, direccion_actual, ciudad, correo, notes)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING *
-                """, (o['order_ref'], o['client_name'], o.get('client_phone'), token,
-                      o.get('novedad'), o.get('fecha_novedad'), o.get('direccion_actual'),
-                      o.get('ciudad'), o.get('correo'), o.get('notes')))
+                """, (o['order_ref'], o['client_name'],
+                      _blank_to_none(o.get('client_phone')), token,
+                      _blank_to_none(o.get('novedad')),
+                      _blank_to_none(o.get('fecha_novedad')),
+                      _blank_to_none(o.get('direccion_actual')),
+                      _blank_to_none(o.get('ciudad')),
+                      _blank_to_none(o.get('correo')),
+                      _blank_to_none(o.get('notes'))))
                 results.append(dict(cur.fetchone()))
         conn.commit()
     return results
