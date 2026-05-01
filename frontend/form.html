@@ -142,50 +142,6 @@
     .input-wrap textarea:focus { border-color: var(--brand); background: #fff; }
     .input-wrap textarea { resize: vertical; min-height: 80px; font-family: inherit; }
 
-    .gps-btn {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: none;
-      border: 1.5px solid var(--brand);
-      color: var(--brand);
-      border-radius: 8px;
-      padding: 10px 16px;
-      font-size: .88rem;
-      font-weight: 600;
-      cursor: pointer;
-      width: 100%;
-      justify-content: center;
-      margin-bottom: 16px;
-      transition: background .15s, color .15s;
-    }
-    .gps-btn:hover { background: var(--brand); color: #fff; }
-    .gps-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
-
-    .divider {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 16px;
-      color: var(--muted);
-      font-size: .8rem;
-    }
-    .divider::before, .divider::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
-    }
-
-    #gps-status {
-      font-size: .8rem;
-      color: var(--muted);
-      margin-bottom: 12px;
-      min-height: 18px;
-    }
-    #gps-status.ok  { color: var(--success); }
-    #gps-status.err { color: #d32f2f; }
-
     .submit-btn {
       width: 100%;
       background: var(--brand);
@@ -293,15 +249,6 @@
         <span class="req">*</span> Dirección de entrega
       </label>
 
-      <button type="button" class="gps-btn" id="gps-btn">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-        Usar mi ubicación actual (GPS)
-      </button>
-
-      <p id="gps-status"></p>
-
-      <div class="divider">o escribe la dirección</div>
-
       <div class="input-wrap">
         <input
           type="text"
@@ -349,7 +296,6 @@
 
 <script>
   const token = window.location.pathname.split('/').pop();
-  let gpsCoords = null;
   let mapPreview = null;
   let autocomplete = null;
 
@@ -382,28 +328,30 @@
     const cfg = await fetch('/api/config').then(r => r.json());
     if (!cfg.maps_api_key) return;
 
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${cfg.maps_api_key}&libraries=places&region=CO&language=es&callback=initAutocomplete`;
-    script.async = true;
-    document.head.appendChild(script);
-  }
+    await new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${cfg.maps_api_key}&libraries=places&region=CO&language=es&loading=async`;
+      script.async = true;
+      script.defer = true;
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
 
-  window.initAutocomplete = function() {
     const input = document.getElementById('address-input');
     autocomplete = new google.maps.places.Autocomplete(input, {
       componentRestrictions: { country: 'co' },
-      fields: ['formatted_address','geometry'],
+      fields: ['formatted_address', 'geometry'],
     });
     autocomplete.addListener('place_changed', () => {
       const place = autocomplete.getPlace();
       if (place.geometry) {
         const lat = place.geometry.location.lat();
         const lng = place.geometry.location.lng();
-        gpsCoords = null; // override GPS if user typed
         showMapPreview(lat, lng, place.formatted_address);
       }
     });
-  };
+  }
 
   function showMapPreview(lat, lng, label) {
     const el = document.getElementById('map-preview');
@@ -418,35 +366,6 @@
     setTimeout(() => mapPreview.invalidateSize(), 100);
   }
 
-  // ── GPS ──────────────────────────────────────────────────────────────────
-  document.getElementById('gps-btn').addEventListener('click', () => {
-    if (!navigator.geolocation) {
-      setGpsStatus('Tu navegador no soporta GPS.', 'err'); return;
-    }
-    setGpsStatus('Obteniendo ubicación…', '');
-    document.getElementById('gps-btn').disabled = true;
-
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        gpsCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setGpsStatus('Ubicación obtenida correctamente.', 'ok');
-        document.getElementById('gps-btn').disabled = false;
-        showMapPreview(gpsCoords.lat, gpsCoords.lng, 'Tu ubicación actual');
-      },
-      err => {
-        setGpsStatus('No se pudo obtener el GPS. Por favor escribe tu dirección.', 'err');
-        document.getElementById('gps-btn').disabled = false;
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  });
-
-  function setGpsStatus(msg, cls) {
-    const el = document.getElementById('gps-status');
-    el.textContent = msg;
-    el.className = cls;
-  }
-
   // ── Submit ───────────────────────────────────────────────────────────────
   document.getElementById('address-form').addEventListener('submit', async e => {
     e.preventDefault();
@@ -454,8 +373,8 @@
     const extra       = document.getElementById('address-extra').value.trim();
     const fullAddress = extra ? `${addressText} — ${extra}` : addressText;
 
-    if (!addressText && !gpsCoords) {
-      alert('Por favor ingresa tu dirección o usa el GPS.'); return;
+    if (!addressText) {
+      alert('Por favor ingresa tu dirección.'); return;
     }
 
     const btn = document.getElementById('submit-btn');
@@ -464,7 +383,6 @@
 
     try {
       const body = { address_text: fullAddress };
-      if (gpsCoords) { body.lat = gpsCoords.lat; body.lng = gpsCoords.lng; }
 
       const res = await fetch(`/api/address/${token}`, {
         method: 'POST',
